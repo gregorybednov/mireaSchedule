@@ -2,9 +2,12 @@ package main
 
 import (
 	"fmt"
+	"time"
 	"github.com/ncruces/zenity"
 	"github.com/xuri/excelize/v2"
+	"github.com/h2non/filetype"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -89,44 +92,74 @@ func makeTable(filename string, theseStrings []string) string {
 	return outstr
 }
 
-func fetchTable(url string, theseStrings []string, outc chan string) {
-	table, err := http.Get(url)
+func fetchTable(url string, theseStrings []string, outc chan string, attempt int) {
+	if attempt > 10 {
+		outc <- ""
+		log.Fatalf("Too many attempts: %d on url: %s", attempt, url)
+	}
+
+	client := &http.Client{}
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		log.Fatalf(err.Error())
+	}
+
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36")
+	table, err := client.Do(req)
 	if err != nil {
 		outc <- ""
 		log.Fatalf("Cannot reach URL: %s", url)
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			outc <- ""
-			return
-		}
-	}(table.Body)
-	if strings.LastIndex(url, "/") != -1 {
-		fname := url[strings.LastIndex(url, "/")+1:]
-		out, err := os.Create(fname)
-		if err != nil {
-			outc <- ""
-			log.Fatalf("Cannot create a file: %s", fname)
-		}
-		defer out.Close()
-		if _, err := io.Copy(out, table.Body); err != nil {
-			outc <- ""
-			log.Fatalf("Cannot write to file: %s", fname)
-		}
-
-		outc <- makeTable(fname, theseStrings)
+	defer table.Body.Close()
+	if strings.LastIndex(url, "/") == -1 {
+		outc <- ""
+		log.Fatalf("Crazy URL error")
 	}
-	outc <- ""
-	log.Fatalf("Crazy URL error")
+
+	fname := url[strings.LastIndex(url, "/")+1:]
+	out, err := os.Create(fname)
+	if err != nil {
+		outc <- ""
+		log.Fatalf("Cannot create a file: %s", fname)
+	}
+	defer out.Close()
+	if _, err := io.Copy(out, table.Body); err != nil {
+		outc <- ""
+		log.Fatalf("Cannot write to file: %s", fname)
+	}
+	
+	buf, _ := ioutil.ReadFile(fname)
+	kind, _ := filetype.Match(buf)
+	if kind.MIME.Value != "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" {
+		os.Remove(fname)
+		time.Sleep(1 * time.Second)
+		fetchTable(url, theseStrings, outc, attempt+1)
+		return
+	}
+
+	//if _, err := excelize.OpenFile(fname); err != nil {
+	//	fetchTable(url, theseStrings, outc, attempt+1)
+	//	return
+	//}
+	outc <- makeTable(fname, theseStrings)
 }
 
 func findRecords(theseStrings []string) string {
+	client := &http.Client{}
 
-	resp, err := http.Get("https://mirea.ru/schedule")
+	req, err := http.NewRequest("GET", "https://mirea.ru/schedule", nil)
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
+
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36")
+	resp, err := client.Do(req)
+        if err != nil {
+                log.Fatalln(err)
+        }
+
+
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		log.Fatal("Cannot reach MIREA Schedule main page: https://mirea.ru/schedule. Code: ", resp.StatusCode)
@@ -142,7 +175,7 @@ func findRecords(theseStrings []string) string {
 	var chans []chan string
 	for i, url := range re.FindAllString(bodyString, -1) {
 		chans = append(chans, make(chan string))
-		go fetchTable(url, theseStrings, chans[i])
+		go fetchTable(url, theseStrings, chans[i], 0)
 	}
 
 	totalString := ""
@@ -184,6 +217,19 @@ func main() {
 		return
 	}
 	prompts := strings.Split(str, "~")
+	dlg, err := zenity.Progress(
+		zenity.Title("Loading..."),
+		zenity.Pulsate())
+	if err != nil {
+		return
+	}
+	defer dlg.Close()
+
+	dlg.Text("Загружаемся...")
+
+	records := findRecords(prompts)
+	
+	dlg.Complete()
 
 	filename, err := zenity.SelectFileSave(
 		zenity.ConfirmOverwrite(),
@@ -192,6 +238,7 @@ func main() {
 			{"Веб-страница HTML", []string{"*.html"}, true},
 			{"Таблица CSV", []string{"*.csv"}, true},
 		})
+
 
 
 	f, err := os.Create(filename)
@@ -204,11 +251,9 @@ func main() {
 			log.Fatal("Unable to close file:", err.Error())
 		}
 	}(f)
-	str = ""
+	str = records
 	if strings.Contains(filename, ".htm") {
-		str = csv2html(filename, findRecords(prompts))
-	} else {
-		str = findRecords(prompts)
+		str = csv2html(filename, str)
 	}
 	_, err = f.WriteString(str)
 
