@@ -231,6 +231,13 @@ func main() {
 	
 	dlg.Complete()
 
+	if records == "" {
+		zenity.Warning("По Вашему запросу результатов не найдено",
+		zenity.Title("Таблицы скачаны, но по запросу нет результатов"),
+		zenity.WarningIcon)
+		os.Exit(1)
+	}
+
 	filename, err := zenity.SelectFileSave(
 		zenity.ConfirmOverwrite(),
 		zenity.Filename(str + ".html"),
@@ -256,7 +263,6 @@ func main() {
 		str = csv2html(filename, str)
 	}
 	_, err = f.WriteString(str)
-
 	if err != nil {
 		log.Fatal("Unable to write into file:", err)
 	}
