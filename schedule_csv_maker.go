@@ -209,7 +209,8 @@ func csv2html (filename string, csv string) string {
 	return res
 }
 
-func main() {
+
+func gui() {
 	const defaultPath = ``
 	str, err := zenity.Entry("Введите поисковый запрос:",
 		zenity.Title("Расписание"))
@@ -228,7 +229,7 @@ func main() {
 	dlg.Text("Загружаемся...")
 
 	records := findRecords(prompts)
-	
+
 	dlg.Complete()
 
 	if records == "" {
@@ -265,5 +266,23 @@ func main() {
 	_, err = f.WriteString(str)
 	if err != nil {
 		log.Fatal("Unable to write into file:", err)
+	}
+}
+
+func cli() {
+	prompts := strings.Split("", "~")
+	records := findRecords(prompts)
+	fmt.Print(records)
+}
+
+func main() {
+	if len(os.Args) > 1 {
+		if os.Args[1] == "--text-mode" {
+			cli()
+		} else {
+			gui()
+		}
+	} else {
+		gui()
 	}
 }
