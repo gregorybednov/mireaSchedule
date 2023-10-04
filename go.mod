@@ -1,7 +1,7 @@
 module github.com/gregorybednov/schedule_util
 
-go 1.23
-//go 1.20.1
+//go 1.23
+go 1.20.1
 
 require (
 	github.com/ncruces/zenity v0.10.10
@@ -11,6 +11,7 @@ require (
 require (
 	github.com/akavel/rsrc v0.10.2 // indirect
 	github.com/dchest/jsmin v0.0.0-20220218165748-59f39799265f // indirect
+	github.com/h2non/filetype v1.1.3 // indirect
 	github.com/josephspurrier/goversioninfo v1.4.0 // indirect
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
 	github.com/randall77/makefat v0.0.0-20210315173500-7ddd0e42c844 // indirect
