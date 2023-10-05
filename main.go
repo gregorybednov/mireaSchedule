@@ -15,7 +15,7 @@ func lesson(rows [][]string, i int, j int, outc chan string, theseStrings []stri
 			result += "I"
 		}
 		result += ";" + [6]string{"пн", "вт", "ср", "чт", "пт", "сб"}[row/14]
-		result += ";" + strconv.Itoa((row%14)/2+1)
+		result += ";" + strconv.Itoa((row%14+1)/2)
 		return result
 	}
 	var ifSearched func(string, []string) string = func(record string, theseStrings []string) string {
