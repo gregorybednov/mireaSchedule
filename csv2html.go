@@ -5,10 +5,16 @@ import "strings"
 func newhtmlrow(row string, outc chan string) {
 	res := "<tr>"
 	for _, col := range strings.Split(row, ";") {
-		res += "<td>" + col + "</td>"
+		if res != "" {
+			res += "<td>" + col + "</td>"
+		}
 	}
 	res += "</tr>"
-	outc <- res
+	if row != "" {
+		outc <- res
+	} else {
+		outc <- ""
+	}
 }
 
 func csv2html (filename string, csv string) string {
