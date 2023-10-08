@@ -1,15 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"io/ioutil"
 	"sort"
 	"regexp"
-	"strings"
-	"os"
 	"io"
 	"time"
 	"net/http"
-	"github.com/h2non/filetype"
+	"github.com/xuri/excelize/v2"
 	"log"
 )
 
@@ -17,12 +16,24 @@ func useragent() (string, string) {
 	return "User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36"
 }
 
+func getData(url string) ([]byte, error) {
+
+    r, err := http.Get(url)
+    if err != nil {
+        panic(err)
+    }
+
+    defer r.Body.Close()
+
+    return ioutil.ReadAll(r.Body)
+}
+
 func fetchTable(url string, theseStrings []string, outc chan []record, attempt int) {
 	if attempt > 10 {
 		outc <- nil
 		log.Fatalf("Too many attempts: %d on url: %s", attempt, url)
 	}
-
+/*
 	client := &http.Client{}
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -37,33 +48,36 @@ func fetchTable(url string, theseStrings []string, outc chan []record, attempt i
 		log.Fatalf("Cannot reach URL: %s", url)
 	}
 	defer table.Body.Close()
-	if strings.LastIndex(url, "/") == -1 {
-		outc <- nil
-		log.Fatalf("Crazy URL error")
-	}
-
-	fname := url[strings.LastIndex(url, "/")+1:]
-	out, err := os.Create(fname)
-	if err != nil {
-		outc <- nil
-		log.Fatalf("Cannot create a file: %s", fname)
-	}
-	defer out.Close()
-	if _, err := io.Copy(out, table.Body); err != nil {
-		outc <- nil
-		log.Fatalf("Cannot write to file: %s", fname)
-	}
+*/
 	
-	buf, _ := ioutil.ReadFile(fname)
-	kind, _ := filetype.Match(buf)
-	if kind.MIME.Value != "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" {
-		os.Remove(fname)
+	data, err := getData(url)
+    	if err != nil {
+		time.Sleep(1 * time.Second)
+		fetchTable(url, theseStrings, outc, attempt+1)
+		return
+    	}
+
+	f, err := excelize.OpenReader(bytes.NewReader(data))
+	if err != nil {
 		time.Sleep(1 * time.Second)
 		fetchTable(url, theseStrings, outc, attempt+1)
 		return
 	}
+	defer func() {
+		if err := f.Close(); err != nil {
+			log.Fatalf(err.Error())
+			return
+		}
+	}()
 
-	outc <- makeTable(fname, theseStrings)
+	rows, err := f.GetRows("Расписание занятий по неделям")
+	if err != nil {
+		//log.Fatalf(err.Error()) # TODO мага
+		outc <- nil
+		return
+	}
+
+	outc <- makeTable(rows, theseStrings)
 }
 
 func concatSlice[T any](slices ...[]T) []T {

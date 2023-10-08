@@ -1,9 +1,11 @@
 ﻿package main
 
 import (
-	"github.com/xuri/excelize/v2"
+	//"fmt"
+	//"io"
+	//"github.com/xuri/excelize/v2"
 	"strconv"
-	"log"
+	//"log"
 	"os"
 	"strings"
 )
@@ -51,26 +53,7 @@ type record struct {
 	Str string
 }
 
-func makeTable(filename string, theseStrings []string) []record {
-
-	f, err := excelize.OpenFile(filename)
-	if err != nil {
-		log.Fatalf(err.Error())
-		return nil
-	}
-	defer func() {
-		if err := f.Close(); err != nil {
-			log.Fatalf(err.Error())
-			return
-		}
-	}()
-
-	rows, err := f.GetRows("Расписание занятий по неделям")
-	if err != nil {
-		//log.Fatalf(err.Error()) # TODO мага
-		return nil
-	}
-
+func makeTable(rows [][]string, theseStrings []string) []record {
 	var lessons []record
 	for i, cell := range rows[2] {
 		if cell == "Дисциплина" && i+1 < len(rows[1]) {
@@ -81,23 +64,17 @@ func makeTable(filename string, theseStrings []string) []record {
 			}
 			for j, c := range chans {
 				str := <- c
-				if str != "" {
-					var lesson record
-					lesson.Index = j
-					if j % 2 != 0 {
-						lesson.Index += 1000
-					}
-					lesson.Str = str
-					lessons = append(lessons, lesson)
+				if str == "" {
+					continue
 				}
+				var lesson record
+				lesson.Index = j + (j%2) * 1000 // thousand for sort priority
+				lesson.Str = str
+				lessons = append(lessons, lesson)
 			}
 		}
 	}
 	
-	//sort.SliceStable(lessons, func(i, j int) bool {
-	//	return lessons[i].Index < lessons[j].Index
-	//})
-
 	return lessons
 }
 

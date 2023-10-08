@@ -1,7 +1,7 @@
 module github.com/gregorybednov/schedule_util
 
-//go 1.23
-go 1.20.1
+go 1.23
+//go 1.20.1
 
 require (
 	github.com/ncruces/zenity v0.10.10
