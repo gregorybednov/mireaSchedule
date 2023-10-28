@@ -2,14 +2,14 @@ package main
 
 import (
 	"bytes"
-	"io/ioutil"
-	"sort"
-	"regexp"
 	"io"
-	"time"
-	"net/http"
-	"github.com/xuri/excelize/v2"
 	"log"
+	"net/http"
+	"regexp"
+	"sort"
+	"time"
+
+	"github.com/xuri/excelize/v2"
 )
 
 func useragent() (string, string) {
@@ -18,14 +18,14 @@ func useragent() (string, string) {
 
 func getData(url string) ([]byte, error) {
 
-    r, err := http.Get(url)
-    if err != nil {
-        panic(err)
-    }
+	r, err := http.Get(url)
+	if err != nil {
+		panic(err)
+	}
 
-    defer r.Body.Close()
+	defer r.Body.Close()
 
-    return ioutil.ReadAll(r.Body)
+	return io.ReadAll(r.Body)
 }
 
 func fetchTable(url string, theseStrings []string, outc chan []record, attempt int) {
@@ -33,29 +33,13 @@ func fetchTable(url string, theseStrings []string, outc chan []record, attempt i
 		outc <- nil
 		log.Fatalf("Too many attempts: %d on url: %s", attempt, url)
 	}
-/*
-	client := &http.Client{}
 
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		log.Fatalf(err.Error())
-	}
-
-	req.Header.Set(useragent())
-	table, err := client.Do(req)
-	if err != nil {
-		outc <- nil
-		log.Fatalf("Cannot reach URL: %s", url)
-	}
-	defer table.Body.Close()
-*/
-	
 	data, err := getData(url)
-    	if err != nil {
+	if err != nil {
 		time.Sleep(1 * time.Second)
 		fetchTable(url, theseStrings, outc, attempt+1)
 		return
-    	}
+	}
 
 	f, err := excelize.OpenReader(bytes.NewReader(data))
 	if err != nil {
@@ -81,11 +65,11 @@ func fetchTable(url string, theseStrings []string, outc chan []record, attempt i
 }
 
 func concatSlice[T any](slices ...[]T) []T {
-  var result []T
-  for _, s := range slices {
-    result = append(result, s...)
-  }
- return result
+	var result []T
+	for _, s := range slices {
+		result = append(result, s...)
+	}
+	return result
 }
 
 func findRecords(theseStrings []string) string {
@@ -98,10 +82,9 @@ func findRecords(theseStrings []string) string {
 
 	req.Header.Set(useragent())
 	resp, err := client.Do(req)
-        if err != nil {
-                log.Fatalln(err)
-        }
-
+	if err != nil {
+		log.Fatalln(err)
+	}
 
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
@@ -114,7 +97,7 @@ func findRecords(theseStrings []string) string {
 		log.Fatal(err)
 	}
 	bodyString := string(bodyBytes)
-	re := regexp.MustCompile(`https://webservices.mirea.ru[^\"\']*(II[TI]|IRI[^\"\']*2[^\"\']*kurs)[^\"\']*.xlsx`)
+	re := regexp.MustCompile(`https://webservices.mirea.ru[^\"\']*(II[TI]|IRI|ITU)[^\"\']*.xlsx`)
 	var tables []chan []record
 	for i, url := range re.FindAllString(bodyString, -1) {
 		tables = append(tables, make(chan []record))
@@ -122,9 +105,9 @@ func findRecords(theseStrings []string) string {
 	}
 
 	//var all_lessons []record
-	var allLessons []record;
+	var allLessons []record
 	for _, c := range tables {
-		lessons := <- c
+		lessons := <-c
 		allLessons = concatSlice(allLessons, lessons)
 	}
 
@@ -136,5 +119,5 @@ func findRecords(theseStrings []string) string {
 	for _, lesson := range allLessons {
 		totalString += lesson.Str + "\n"
 	}
-	return totalString 
+	return totalString
 }
